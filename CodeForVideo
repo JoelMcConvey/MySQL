@@ -1,0 +1,237 @@
+Register As a Customer And Encrypt Password
+
+START TRANSACTION;
+
+	SET @customerID = NULL;
+	SET @firstName = 'Joel';
+	SET @surname = 'McConvey';
+	SET @username = 'jmcconvey1996';
+	SET @password = 'randomPassword1';
+	SET @contactPermission = '1';
+	SET @contactID = '30';
+	SET @addressID = '1';
+	SET @number = '07912345678';
+	SET @email = 'jmcconvey01@qub.ac.uk';
+
+
+	SELECT @salt := SUBSTRING(SHA1(RAND()), 1, 6);
+
+	SELECT @saltedHash := SHA1(CONCAT(@salt, @password)) AS salted_hash_value;
+
+	SELECT @storedSaltedHash := CONCAT(@salt,@saltedHash) AS password_to_be_stored;
+
+	INSERT INTO Customer (customerID, firstName, surname, username, password, contactPermission, contactID, addressID) 
+		  		VALUES     (NULL,       @firstName, @surname, @username, @storedSaltedHash, @contactPermission, @contactID, @addressID);
+
+	INSERT INTO CustomerContactDetails (contactNumber, emailAddress)
+				VALUES                 (@number,       @email);
+
+	SAVEPOINT customerEntry;
+    
+    INSERT INTO Customer (customerID, firstName, surname, username, password, contactPermission, contactID, addressID) 
+             	VALUES   (NULL,       @firstName, @surname, @username, @storedSaltedHash, @contactPermission, @contactID, @addressID);
+              
+    ROLLBACK TO customerEntry;
+
+COMMIT;
+
+--------------------------------------------------------------------
+
+Demonstrate Record Entry
+
+SELECT * FROM Customer
+INNER JOIN CustomerContactDetails
+ON Customer.contactID=CustomerContactDetails.contactID
+ORDER BY Customer.customerID DESC LIMIT 1;
+
+--------------------------------------------------------------------
+
+Decrypting Password At Login
+
+SELECT password FROM Customer WHERE username = 'jmcconvey1996';
+
+SET @loginPassword = 'randomPassword1';
+SET @loginUsername = 'jmcconvey1996';
+
+SELECT @saltInUse := SUBSTRING(password, 1, 6) FROM Customer WHERE username = @loginUsername;
+
+SELECT @storedSaltedHashInUse := SUBSTRING(password, 7, 40) FROM Customer WHERE username = @loginUsername;
+
+SELECT @saltedHash := SHA1(CONCAT(@saltInUse, @loginPassword)) AS salted_hash_value_login;
+
+--------------------------------------------------------------------
+
+Card Info Encryption
+
+SET @cardholderName = 'Joel McConvey';
+SET @cardType = 'Visa';
+SET @cardlongnumber = '1234 1234 5678 5678'; 
+SET @expiryDate= '2024-11-01';
+SET @customerID = 84;
+
+SET @secretPasssword = 'SetToEncrypt';
+
+SET @cardlongnumber = AES_ENCRYPT(@cardlongnumber,@secretPasssword);
+
+INSERT INTO cardDetails (cardholderName, cardType, cardLongNumber, expiryDate, customerID) 
+VALUES (@cardholdername, @cardType, @cardlongnumber, @expiryDate, @customerID);
+
+SET @secretPasssword = 'SetToEncrypt';
+
+--------------------------------------------------------------------
+
+Show Card Info Encrypted
+
+SELECT * FROM CardDetails
+WHERE customerID = 84;
+
+--------------------------------------------------------------------
+
+Card Decryption
+
+SET @secretPasssword = 'SetToEncrypt';
+
+SELECT cardID, cardholderName, cardType, AES_DECRYPT(cardLongNumber, @secretPasssword), expiryDate, customerID
+FROM cardDetails WHERE customerID = 84;
+
+--------------------------------------------------------------------
+
+Statement To Find Room For At Least 2 People In Rome
+
+SELECT DISTINCT hotelName FROM Hotel
+INNER JOIN Room
+ON Room.hotelID=Hotel.hotelID
+INNER JOIN RoomSize
+ON RoomSize.roomSizeID=Room.roomSizeID
+INNER JOIN Destination
+ON Hotel.hotelID=Destination.hotelID
+INNER JOIN City
+ON City.cityID=Destination.cityID
+WHERE City.cityName LIKE 'Rom%' AND guestCapacity >= 2;
+
+--------------------------------------------------------------------
+
+Now Order By Star Rating
+
+SELECT DISTINCT hotelName, hotelStarRating FROM Hotel
+INNER JOIN Room
+ON Room.hotelID=Hotel.hotelID
+INNER JOIN RoomSize
+ON RoomSize.roomSizeID=Room.roomSizeID
+INNER JOIN Destination
+ON Hotel.hotelID=Destination.hotelID
+INNER JOIN City
+ON City.cityID=Destination.cityID
+WHERE City.cityName LIKE 'Rom%' AND guestCapacity >= 2 ORDER BY hotelStarRating DESC;
+
+--------------------------------------------------------------------
+
+With Breakfast Included
+
+SELECT DISTINCT hotelName, hotelStarRating, attractionName, amenitiesName FROM Hotel
+INNER JOIN Room
+ON Room.hotelID=Hotel.hotelID
+INNER JOIN HotelAmenities
+ON HotelAmenities.hotelID=Hotel.hotelID
+INNER JOIN Amenities
+ON Amenities.amenitiesID=HotelAmenities.amenitiesID
+INNER JOIN RoomSize
+ON RoomSize.roomSizeID=Room.roomSizeID
+INNER JOIN Destination
+ON Hotel.hotelID=Destination.hotelID
+INNER JOIN City
+ON City.cityID=Destination.cityID
+INNER JOIN Attraction
+ON Attraction.cityID=City.cityID
+WHERE City.cityName LIKE 'Rom%' AND attractionName = 'The Colosseum' AND amenitiesName = 'Breakfast Included' AND guestCapacity >= 2 ORDER BY hotelStarRating DESC;
+
+--------------------------------------------------------------------
+
+Find The Hotels Room and Price
+
+SELECT hotelName, roomName, roomPrice FROM Room
+INNER JOIN RoomAvailability
+ON Room.roomID=RoomAvailability.roomID
+INNER JOIN Hotel
+ON Hotel.hotelID=Room.hotelID
+WHERE Hotel.hotelID = 3 AND roomPrice BETWEEN 100.00 AND 300.00 ORDER BY roomPrice DESC;
+
+--------------------------------------------------------------------
+
+Check Room Price Then Availabilty
+
+SELECT hotelName, roomName, numberOfRooms FROM RoomAvailability
+INNER JOIN Room
+ON Room.roomID=RoomAvailability.roomID
+INNER JOIN Hotel
+ON Hotel.hotelID=Room.hotelID
+WHERE hotel.hotelID = 3;
+
+SELECT RoomBookingID, stayDate FROM RoomBooking
+INNER JOIN RoomAvailability
+ON RoomAvailability.roomID=RoomBooking.roomID
+INNER JOIN Room
+ON Room.roomID=RoomBooking.roomID
+WHERE RoomBooking.roomID = 5;
+
+SELECT COUNT(RoomBookingID) FROM RoomBooking
+INNER JOIN RoomAvailability
+ON RoomAvailability.roomID=RoomBooking.roomID
+INNER JOIN Room
+ON Room.roomID=RoomBooking.roomID
+WHERE RoomBooking.roomID = 5;
+--------------------------------------------------------------------
+
+Insert Room Booking
+
+INSERT INTO `RoomBooking` (`roomBookingID`, `stayDate`, `numberOfNights`, `totalCost`, `seasonID`, `roomID`) 
+VALUES (NULL, '2022-04-15', '7', '253', '3', '5');
+
+--------------------------------------------------------------------
+
+Statement To Update Room Price
+
+SET @roombookingid = 30;
+SET @seasonid = 3;
+
+SELECT @updatedPrice := SUM((roomPrice * numberOfNights) * seasonalMultiplier) FROM RoomBooking
+INNER JOIN SeasonalAdjustment
+ON RoomBooking.seasonID=SeasonalAdjustment.seasonID
+INNER JOIN RoomAvailability
+ON RoomAvailability.roomID=RoomBooking.roomID
+WHERE  RoomBooking.roomBookingID = @roombookingid AND SeasonalAdjustment.seasonID = 3;
+
+UPDATE RoomBooking SET totalCost = @updatedPrice WHERE RoomBooking.roomBookingID = @roombookingid;
+
+THEN
+
+Statement For Booking Entry
+
+START TRANSACTION;
+
+    INSERT INTO Payment (`paymentID`, `paymentDate`, `paymentAmount`, `paymentReference`, `currencyID`) 
+    VALUES (@paymentID, CURRENT_DATE, @updatedPrice, 'HYE87YT', 1);
+	SET @paymentID = LAST_INSERT_ID();
+	
+	INSERT INTO `Booking` (`bookingID`, `bookingDate`, `bookingTimestamp`, `checkIn`, `bookingReference`, `roomBookingID`, `currencyID`, `paymentID`, 				`customerID`, `requestsID`) 
+	VALUES (@bookingID, CURRENT_DATE, CURRENT_TIMESTAMP, '2022-04-15', 'WEC87HD', 30, '1', @paymentID, '60', '1');
+    SET @bookingID = LAST_INSERT_ID();
+    
+COMMIT;
+
+--------------------------------------------------------------------
+
+Statement To Show Booking Details
+
+SET @bookingID = 31;
+
+SELECT firstName, surname, currencySymbol, totalCost, checkIn, numberOfNights AS Duration, bookingReference, paymentAmount, paymentReference FROM RoomBooking
+INNER JOIN Booking
+ON RoomBooking.roomBookingID=Booking.roomBookingID
+INNER JOIN Payment
+ON Booking.paymentID=Payment.paymentID
+INNER JOIN Currency
+ON Currency.currencyID=Booking.currencyID
+INNER JOIN Customer
+ON Customer.customerID=Booking.customerID
+WHERE Booking.bookingID = @bookingID;
